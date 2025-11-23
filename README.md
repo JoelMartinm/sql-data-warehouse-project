@@ -1,275 +1,94 @@
-# SQL Data Warehouse Project  
-## End-to-End Data Warehouse Implementation (Bronze → Silver → Gold)
 
-This project demonstrates the complete development of a SQL-based data warehouse using Microsoft SQL Server.  
-It covers raw data ingestion, data cleansing and standardisation, and the creation of analytics-ready dimensional models.
+# SQL Server Data Warehouse Project
 
-The solution follows a **medallion architecture**, providing clarity, maintainability, and scalability across all warehouse layers.
+This project showcases the complete design and implementation of a full **SQL Server–based Data Warehouse** built entirely from raw text files originating from two separate operational systems: **ERP** and **CRM**. The goal of this project was not just to load and clean data, but to demonstrate how a disciplined and well‑structured warehouse architecture, supported by proper modelling, transformation logic, and integration workflows, can combine fragmented operational data into a unified analytical environment.
 
----
-
-## 1. Project Overview  
-
-The purpose of this project is to design and build a structured data warehouse using CRM and ERP datasets.  
-The warehouse is divided into:
-
-- **Bronze Layer**: Raw, unmodified ingested data.  
-- **Silver Layer**: Cleaned, standardised, and integrated tables.  
-- **Gold Layer**: Final star-schema views for analytics.
-
-This structure ensures data quality, clear traceability, and straightforward reporting.
+The warehouse follows a modern **medallion-style design** and includes detailed stages of ingestion, transformation, integration, and modelling. It also features a clean business-oriented star schema, making it suitable for analytics, reporting, and BI tools.
 
 ---
 
-## 2. Architecture Diagram (ASCII)
+## Data Architecture  
+<img width="3064" height="2360" alt="image" src="https://github.com/user-attachments/assets/27f7ec98-c3b9-436b-9349-bb60807c833d" />
 
-```
-            +------------------+
-            |     RAW DATA     |
-            |   (CSV: CRM/ERP) |
-            +---------+--------+
-                      |
-                      v
-         +---------------------------+
-         |        BRONZE LAYER       |
-         | Raw ingestion of source   |
-         | files (no transformations)|
-         +-------------+-------------+
-                       |
-                       v
-         +---------------------------+
-         |        SILVER LAYER       |
-         | Data cleansing, typing,   |
-         | natural key alignment,    |
-         | merging CRM + ERP         |
-         +-------------+-------------+
-                       |
-                       v
-         +---------------------------+
-         |         GOLD LAYER        |
-         | Star schema:              |
-         |   - dim_customers         |
-         |   - dim_products          |
-         |   - fact_sales            |
-         | Analytics-ready outputs   |
-         +---------------------------+
-```
+
+At the highest level, the architecture defines how data moves from raw sources through structured layers. ERP and CRM files are ingested independently, processed through sequential transformation steps, and reshaped into a consolidated analytics-ready model. Each layer represents a higher level of structure and refinement, allowing the data to evolve gradually instead of being heavily transformed in a single step. This approach ensures transparency, troubleshooting ease, and future scalability.
 
 ---
 
-## 3. Repository Structure  
+## Data Integration Design  
+<img width="5652" height="2004" alt="image" src="https://github.com/user-attachments/assets/393bdb74-8823-49ac-84c6-0921c15c2fec" />
 
-```
-/datasets               → Raw CSV files
-/scripts
-    /bronze            → Ingestion scripts
-    /silver            → Cleansing + standardisation scripts
-    /gold              → Star-schema dimensional views
-/docs                  → Diagrams, notes, data dictionary
-/tests                 → SQL quality checks
-README.md              → Project documentation
-```
 
----
+The data integration strategy revolves around bringing together two systems that do not share a consistent structure. The ERP system maintains product, customer, and location information from an operational viewpoint. The CRM system captures customer attributes and sales details from the business-facing viewpoint. In this project, I designed a set of integration rules inside SQL Server to align identifiers, reconcile differences in naming and formatting, standardise product and customer references, and ensure that once loaded into Silver and Gold, records from both systems could be matched reliably.
 
-## 4. Bronze Layer  
-### Purpose  
-The Bronze layer stores **raw operational data exactly as received**.  
-No transformations, no logic, no changes.
-
-### Actions Performed  
-- Imported CRM and ERP CSV files into SQL Server.  
-- Preserved original column names and formats.  
-- Maintained raw structures for auditability and traceability.
-
-### Raw Tables  
-Examples:  
-- `bronze.crm_cust_info_raw`  
-- `bronze.crm_sales_details_raw`  
-- `bronze.crm_prd_info_raw`  
-- `bronze.erp_loc_a101_raw`  
-- `bronze.erp_px_cat_g1v2_raw`  
+This required:
+- mapping ERP and CRM customer records,
+- normalising product keys between systems,
+- applying consistent date formats,
+- recalculating inconsistent sales values,
+- validating location and region fields,
+- and ensuring referential integrity across sources.
 
 ---
 
-## 5. Silver Layer  
-### Purpose  
-The Silver layer standardises the raw data, fixes inconsistencies, ensures consistent key structures, and prepares tables for analytical modeling.
+## Data Flow  
+<img width="2444" height="1484" alt="image" src="https://github.com/user-attachments/assets/94db5386-d426-440f-acfd-f1b36995cc46" />
 
-### Key Transformations  
 
----
-
-### 5.1 Customer Cleansing (`silver.crm_cust_info`)  
-- Unified column names  
-- Converted creation timestamps  
-- Cleaned up gender values  
-- Prepared CRM natural keys  
-- Validated first/last names  
-- Ensured consistent date formatting  
+The data flow demonstrates the exact journey of data from raw files to clean business-ready models. It begins with ingestion from two folders, followed by Bronze loading, then a series of Silver-layer transformations, and finally the construction of a Gold-layer star schema. At each stage, data quality increases due to incremental refinement—allowing issues to be addressed in manageable steps while maintaining full reproducibility.
 
 ---
 
-### 5.2 Product Cleansing (`silver.crm_prd_info`)  
-- Converted numeric product cost  
-- Standardised product line and category identifiers  
-- Prepared start/end dates  
-- Ensured valid keys for linking with ERP categories  
+## 🥉 Bronze Layer — Raw Ingestion
+
+In this first layer, I imported all ERP and CRM text files exactly as they exist. The purpose of Bronze is to preserve the original structure, enabling traceability and auditability. Rather than fixing errors immediately, this layer creates a faithful mirror of the raw data.
+
+In Bronze, I:
+- loaded all text files into SQL Server using raw datatypes,
+- ensured row counts matched the source files,
+- preserved all messy fields without alteration,
+- added fundamental structure so the files could be queried consistently.
+
+This stage allowed downstream layers to build reliably on top of a stable foundation.
 
 ---
 
-### 5.3 Sales Details (`silver.crm_sales_details`)  
-- Casted quantity, price, and sales amounts as numeric  
-- Normalised key values (`sls_prd_key`, `sls_cust_id`)  
-- Converted all date fields (order, ship, due)  
-- Removed inconsistent values  
+## 🥈 Silver Layer — Cleaning, Standardisation, Alignment
+
+The Silver layer contains the most meaningful transformation logic. This is the stage where the ERP and CRM datasets begin to converge into a unified format. The goal is to clean inconsistencies, handle invalid values, normalise fields, integrate lookup data, and generate a refined dataset suitable for modelling.
+
+In this layer, I:
+- corrected invalid date strings and cast them into proper SQL date formats,
+- standardised numeric fields, corrected decimal issues, and recalculated incorrect sales values,
+- cleaned demographic and customer attributes (gender, country, birthdate),
+- removed duplicate records and filtered invalid rows,
+- reconciled mismatched product identifiers between ERP and CRM,
+- merged CRM and ERP customer information into unified structures,
+- aligned product category and product metadata fields,
+- enforced referential integrity across the cleaned tables.
+
+By the end of Silver, all major inconsistencies were resolved, and the dataset represented a cleaned, structured, and joined version of both systems.
 
 ---
 
-### 5.4 ERP Customer Data (`silver.erp_cust_az12`)  
-- Converted birthdates from string → DATE  
-- Cleaned gender entries  
-- Standardised customer identifiers  
-- Prepared attributes for dimensional enrichment  
+## 🥇 Gold Layer — Business Data Model
+
+<img width="5400" height="1988" alt="image" src="https://github.com/user-attachments/assets/4178ea51-8dad-477d-873f-0d71c9529bdd" />
+
+
+The Gold layer contains the final business-ready analytical model. Here, I designed a star schema that centralises sales records and enriches them through descriptive dimensions. The model was constructed following Kimball dimensional modelling principles and is optimised for BI tools, dashboards, and ad‑hoc analysis.
+
+In this stage, I:
+- built a unified `fact_sales` table combining ERP and CRM fields,
+- generated `dim_customers` with cleaned demographics and unified customer identifiers,
+- built `dim_products` with merged ERP–CRM product references,
+- incorporated business logic fields such as product line names, category groupings, and price validations,
+- ensured the star schema supports fast aggregation and intuitive navigation for analysts.
+
+The Gold model represents a single source of truth that integrates the entire ERP and CRM ecosystem into one coherent analytical layer.
 
 ---
 
-### 5.5 ERP Category Mapping (`silver.erp_px_cat_g1v2`)  
-- Standardised category and subcategory labels  
-- Cleaned maintenance attributes  
-- Normalised product/category IDs  
+## Final Summary
 
----
-
-### Result  
-The Silver layer produces a set of clean, consistent, relational tables suitable for joining, surrogate key creation, and analytics modeling.
-
----
-
-## 6. Gold Layer  
-### Purpose  
-The Gold layer implements the **dimensional model** (star schema) used for reporting, analytics, and BI tools.
-
-Gold tables are created as **SQL views**, ensuring:  
-- Reusability  
-- Real-time updates when Silver data updates  
-- Clean separation from transformation logic  
-
----
-
-## 6.1 Dimension: Customers (`gold.dim_customers`)  
-
-### Transformations  
-- Joined CRM customer data with ERP customer-birthdate data.  
-- Added country information via ERP location table.  
-- Implemented a gender fallback rule:
-  ```
-  IF CRM gender = 'n/a' → use ERP gender
-  ```
-- Generated surrogate primary key using:
-  ```
-  ROW_NUMBER() OVER (ORDER BY cst_id)
-  ```
-- Selected final output columns required for analytics.
-
-### Final Columns  
-- customer_key  
-- customer_id  
-- customer_number  
-- first_name  
-- last_name  
-- marital_status  
-- gender  
-- birthdate  
-- country  
-- create_date  
-
----
-
-## 6.2 Dimension: Products (`gold.dim_products`)  
-
-### Transformations  
-- Joined CRM products with ERP category definitions.  
-- Filtered to include **active products only** (`prd_end_dt IS NULL`).  
-- Generated surrogate product key:
-  ```
-  ROW_NUMBER() OVER (ORDER BY prd_start_dt, prd_key)
-  ```
-- Mapped category, subcategory, cost, line, and maintenance attributes.
-
-### Final Columns  
-- product_key  
-- product_id  
-- product_number  
-- product_name  
-- category_id  
-- category  
-- subcategory  
-- maintenance  
-- cost  
-- product_line  
-- start_date  
-
----
-
-## 6.3 Fact Table: Sales (`gold.fact_sales`)  
-
-### Transformations  
-- Joined sales details with both dimensions:
-  - `gold.dim_products` using product number  
-  - `gold.dim_customers` using customer ID  
-- Provided both surrogate and natural keys  
-- Cleaned metrics (sales, quantity, price)  
-- Preserved all date attributes  
-
-### Final Columns  
-- order_number  
-- product_key  
-- customer_key  
-- customer_id  
-- order_date  
-- shipping_date  
-- due_date  
-- sales_amount  
-- quantity  
-- price  
-
----
-
-## 7. Analytical Use Cases  
-The final star schema supports questions such as:
-
-- Total sales by customer, country, or demographic  
-- Product performance by category or subcategory  
-- Sales quantity vs. revenue trends  
-- Customer-product segmentation  
-- Temporal analysis (order vs shipping vs due dates)
-
-These use cases are unlocked through the unified and cleansed data model in the Gold layer.
-
----
-
-## 8. How to Run the Project  
-
-1. Install SQL Server.  
-2. Create a new database.  
-3. Run scripts in the following order:
-   - `/scripts/bronze`
-   - `/scripts/silver`
-   - `/scripts/gold`
-4. Load raw CSVs into Bronze tables.  
-5. Refresh Silver and Gold views.
-
----
-
-## 9. Conclusion  
-
-This project implements a complete medallion-based data warehouse, transforming operational CRM and ERP data from raw ingestion to analytics-ready dimensional models.  
-The structured Bronze → Silver → Gold approach ensures data reliability, consistency, and usability for analysis.
-
-
-
-
-## 🛡️ License
-
-This project is licensed under the [MIT License](LICENSE). You are free to use, modify, and share this project with proper attributi
+This project demonstrates a complete data engineering lifecycle implemented entirely in SQL Server. Starting from disconnected operational text files, I built a multi-layered warehouse that progressively enhances data quality, integrates multiple systems, and results in a polished dimensional model suitable for reporting. The approach emphasises clarity, strong modelling foundations, and realistic enterprise-grade design. It reflects experience not only in SQL coding, but also in architectural thinking, data quality stewardship, and analytical readiness.
