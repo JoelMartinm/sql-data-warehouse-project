@@ -6,7 +6,8 @@ This project showcases the complete design and implementation of a full **SQL Se
 The warehouse follows a modern **medallion-style design** and includes detailed stages of ingestion, transformation, integration, and modelling. It also features a clean business-oriented star schema, making it suitable for analytics, reporting, and BI tools.
 
 ---
-
+### Credits
+This project is inspired by the work of **Baraa Salkni**, whose structure and approach helped shape the design and direction of this data warehouse project.
 ## Data Architecture  
 <img width="3064" height="2360" alt="image" src="https://github.com/user-attachments/assets/27f7ec98-c3b9-436b-9349-bb60807c833d" />
 
